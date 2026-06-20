@@ -1,52 +1,70 @@
-# Stock-model-prediction
+# Stock Price Prediction using LSTM and Technical Indicators
 
-Stock Price Prediction Using LSTM and Technical Indicators
-Overview
-This project involves using a Long Short-Term Memory (LSTM) neural network to predict stock prices, incorporating technical indicators such as Moving Averages (MA) and the Relative Strength Index (RSI).
-Data Collection and Preprocessing
+An LSTM (Long Short-Term Memory) neural network that predicts next-day stock closing prices using a 60-day lookback window of price data and technical indicators (moving averages, RSI). Includes a Flask API for serving real-time predictions.
 
-    Data Source: The project fetches historical stock data for Apple Inc. (AAPL) from a financial data source.
-    Data Range: The data spans from January 2015, with a total of 2014 rows initially collected.
-    Features:
-        Open, High, Low, Close, Adj Close, and Volume are the primary features.
-        Additional features calculated include:
-            Moving Averages (MA50 and MA200): 50-day and 200-day moving averages.
-            Relative Strength Index (RSI): A momentum indicator measuring the magnitude of recent price changes.
+## Overview
 
-Feature Engineering
+| Component | Description |
+|---|---|
+| `lstm_stock_prediction.ipynb` | Full pipeline: data fetching, feature engineering, model training, evaluation, and visualisation |
+| `app.py` | Flask API that fetches live data for a given ticker and serves a price prediction from the trained model |
+| `lstm_stock_model.keras` | Pre-trained model weights (trained on AAPL, 2015–2023) |
 
-    Moving Averages: Calculated for 50 and 200 days to capture long-term and short-term trends.
-    RSI: Computed to gauge the stock's recent price changes and identify overbought or oversold conditions.
-    Handling NaN Values: After feature engineering, the dataset is cleaned to handle any NaN values, resulting in 1965 rows.
+## Pipeline
 
-Model Implementation
+1. **Data fetching** — historical OHLCV data pulled via `yfinance`
+2. **Feature engineering** — 20-day & 50-day moving averages, RSI (14-day, Wilder's smoothing)
+3. **Sequence preparation** — features scaled to [0, 1] and reshaped into 60-day rolling windows
+4. **Model** — 2-layer LSTM (50 units each) with dropout (0.2) regularisation
+5. **Evaluation** — RMSE, MAE, and MAPE on a held-out test split, with predicted-vs-actual price plots
 
-    LSTM Model:
-        The model is built using the Keras library in Python.
-        The LSTM layer is used to capture sequential dependencies in the stock price data.
-        The model is trained over 100 epochs with a batch size of 48.
-        The loss function used is Mean Squared Error (MSE), and the optimizer is Adam.
+## Results
 
-Training and Evaluation
+On the AAPL test set (2015–2023, 80/20 train/test split), the model achieves the error metrics printed in the notebook's evaluation section (Section 8) — re-run the notebook to reproduce them, since exact values depend on `yfinance`'s data availability at run time.
 
-    Training Process:
-        The model is trained on the preprocessed data, with the loss decreasing over epochs, indicating model convergence.
-        Example loss values at different epochs:
+## Tech Stack
 
-        text
-        Epoch 1/100 - loss: 0.0124
-        Epoch 10/100 - loss: 0.0010
-        Epoch 50/100 - loss: 3.9973e-04
+`Python` · `TensorFlow/Keras` · `scikit-learn` · `pandas` · `yfinance` · `Flask` · `Matplotlib`
 
-        The training process is efficient, with each epoch taking approximately 1 second and 14 milliseconds per step.
-    Evaluation:
-        The model's performance is evaluated based on the MSE loss, which decreases significantly over the training epochs, indicating a good model fit.
+## Setup
 
-Code Structure
-The code is organized into several sections:
+```bash
+pip install -r requirements.txt
+```
 
-    Data Fetching: Scripts for fetching historical stock data.
-    Data Preprocessing: Code for cleaning and preparing the data by calculating additional features like MA and RSI.
-    Model Definition: Code for defining the LSTM model architecture.
-    Model Training: Scripts for training the model over the specified number of epochs.
-    Evaluation: Code for printing out the loss at each epoch to monitor model performance.
+## Running the notebook
+
+```bash
+jupyter notebook lstm_stock_prediction.ipynb
+```
+
+Run cells sequentially — each section is self-contained and documented with markdown explanations.
+
+## Running the API
+
+```bash
+python app.py
+```
+
+Then, in another terminal:
+
+```bash
+curl -X POST http://127.0.0.1:5000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"ticker": "AAPL"}'
+```
+
+## Known Limitations
+
+- **No walk-forward validation** — a single chronological train/test split likely overstates real-world performance compared to rolling-origin backtesting.
+- **Scaler mismatch in `app.py`** — the live prediction endpoint currently re-fits a `MinMaxScaler` on the fetched window rather than reusing the exact scaler fitted during training. This is a known issue (flagged in code comments) and will introduce some prediction bias; the correct fix is to persist and reload the training-time scaler (e.g. via `joblib`) rather than refitting it at inference time.
+- **No transaction cost or slippage modelling** — predicting price is not the same as predicting profitable trades.
+- **Single-ticker validation** — only tested on AAPL; performance on other tickers (especially more volatile or thinly-traded ones) is unverified.
+
+## Disclaimer
+
+This is an educational project exploring time-series deep learning on financial data. **It is not a trading system and should not be used to make real investment decisions.** Stock prices are influenced by far more information than historical price patterns alone, and this model has not been validated for live trading use.
+
+## Author
+
+Chiruvanuru Kumar Tapaswin — [LinkedIn](https://www.linkedin.com/in/chiruvanuru-kumar-tapaswin)
